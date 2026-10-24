@@ -1,0 +1,108 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}系统设置{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-heading"><div><span class="page-eyebrow">网站配置</span><h2>系统设置</h2><p>自定义首页内容与查询方式，让授权信息清晰呈现。</p></div><span class="page-heading-icon"><i class="fas fa-sliders-h" aria-hidden="true"></i></span></div>
+
+    <div class="card mb-4 settings-card">
+        <div class="card-header"><h5 class="mb-0"><i class="fas fa-palette"></i> 首页内容与查询设置</h5><p>保存修改后，刷新首页即可查看最新内容。</p></div>
+        <div class="card-body">
+            <form id="siteSettingsForm">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label for="siteName" class="form-label">网站名称（浏览器标签页标题）</label>
+                        <input id="siteName" class="form-control" maxlength="200" required value="{{ site_settings.site_name }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="pageHeading" class="form-label">首页顶部标题</label>
+                        <input id="pageHeading" class="form-control" maxlength="200" required value="{{ site_settings.page_heading }}">
+                    </div>
+                    <div class="col-12">
+                        <label for="rechargeNotice" class="form-label">充值提示内容</label>
+                        <input id="rechargeNotice" class="form-control" maxlength="200" required value="{{ site_settings.recharge_notice }}">
+                    </div>
+                    <div class="col-12">
+                        <label for="safetyNotice" class="form-label">财产安全提示内容</label>
+                        <textarea id="safetyNotice" class="form-control" rows="3" maxlength="1000" required>{{ site_settings.safety_notice }}</textarea>
+                        <div class="form-text">支持普通文字和换行，保存后刷新首页生效。</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="officialWechat" class="form-label">官方客服微信号</label>
+                        <input id="officialWechat" class="form-control" maxlength="200" required value="{{ site_settings.official_wechat }}">
+                        <div class="form-text">点击首页“联系官方客服”后将复制此微信号，并显示在弹窗中。</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="returnSiteUrl" class="form-label">返回网站链接</label>
+                        <input id="returnSiteUrl" class="form-control" type="url" maxlength="500" required value="{{ site_settings.return_site_url }}" placeholder="https://example.com/">
+                        <div class="form-text">首页“返回网站”按钮将跳转到此地址。</div>
+                    </div>
+                    <div class="col-12"><hr class="my-2"><h6 class="mb-0"><i class="fas fa-certificate"></i> 查询结果文案</h6></div>
+                    <div class="col-md-6"><label for="certificationTitle" class="form-label">认证通过标题</label><input id="certificationTitle" class="form-control" maxlength="200" required value="{{ site_settings.certification_title }}"></div>
+                    <div class="col-md-6"><label for="officialCertification" class="form-label">官方认证文字</label><input id="officialCertification" class="form-control" maxlength="100" required value="{{ site_settings.official_certification }}"></div>
+                    <div class="col-12"><label for="assuranceNotice" class="form-label">认证通过提示内容</label><input id="assuranceNotice" class="form-control" maxlength="200" required value="{{ site_settings.assurance_notice }}"></div>
+                    <div class="col-12"><hr class="my-2"><h6 class="mb-0"><i class="fas fa-tags"></i> 信息字段名称</h6></div>
+                    <div class="col-md-4"><label for="agentNicknameLabel" class="form-label">代理昵称名称</label><input id="agentNicknameLabel" class="form-control" maxlength="50" required value="{{ site_settings.agent_nickname_label }}"></div>
+                    <div class="col-md-4"><label for="agentCodeLabel" class="form-label">代理编号名称</label><input id="agentCodeLabel" class="form-control" maxlength="50" required value="{{ site_settings.agent_code_label }}"></div>
+                    <div class="col-md-4"><label for="agentWechatLabel" class="form-label">微信号名称</label><input id="agentWechatLabel" class="form-control" maxlength="50" required value="{{ site_settings.agent_wechat_label }}"></div>
+                    <div class="col-md-4"><label for="agentPhoneLabel" class="form-label">手机号名称</label><input id="agentPhoneLabel" class="form-control" maxlength="50" required value="{{ site_settings.agent_phone_label }}"></div>
+                    <div class="col-md-4"><label for="agentAuthorizationDateLabel" class="form-label">授权时间名称</label><input id="agentAuthorizationDateLabel" class="form-control" maxlength="50" required value="{{ site_settings.agent_authorization_date_label }}"></div>
+                    <div class="col-12 captcha-setting">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" role="switch" id="captchaEnabled" {% if site_settings.captcha_enabled %}checked{% endif %}>
+                            <label class="form-check-label" for="captchaEnabled">启用查询验证码</label>
+                        </div>
+                        <div class="form-text">关闭后首页隐藏验证码，查询接口也不再要求验证码。</div>
+                    </div>
+                    <div class="col-12 settings-actions">
+                        <button class="btn btn-primary" id="saveSiteSettings" type="submit"><i class="fas fa-save"></i> 保存网站设置</button>
+                        <span id="siteSettingsMessage" class="ms-2" role="status"></span>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+$('#siteSettingsForm').submit(function(event) {
+    event.preventDefault();
+    $('#saveSiteSettings').prop('disabled', true);
+    $('#siteSettingsMessage').removeClass('text-success text-danger').text('正在保存…');
+    $.ajax({
+        url: '/admin/api/site-settings',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({
+            site_name: $('#siteName').val(),
+            page_heading: $('#pageHeading').val(),
+            recharge_notice: $('#rechargeNotice').val(),
+            safety_notice: $('#safetyNotice').val(),
+            official_wechat: $('#officialWechat').val(),
+            return_site_url: $('#returnSiteUrl').val(),
+            certification_title: $('#certificationTitle').val(),
+            official_certification: $('#officialCertification').val(),
+            assurance_notice: $('#assuranceNotice').val(),
+            agent_nickname_label: $('#agentNicknameLabel').val(),
+            agent_code_label: $('#agentCodeLabel').val(),
+            agent_wechat_label: $('#agentWechatLabel').val(),
+            agent_phone_label: $('#agentPhoneLabel').val(),
+            agent_authorization_date_label: $('#agentAuthorizationDateLabel').val(),
+            captcha_enabled: $('#captchaEnabled').prop('checked')
+        }),
+        success: function(response) {
+            $('#siteSettingsMessage').addClass('text-success').text(response.message);
+        },
+        error: function(xhr) {
+            $('#siteSettingsMessage').addClass('text-danger').text(xhr.responseJSON?.message || '保存失败，请刷新后重试');
+        },
+        complete: function() { $('#saveSiteSettings').prop('disabled', false); }
+    });
+});
+
+</script>
+{% endblock %}

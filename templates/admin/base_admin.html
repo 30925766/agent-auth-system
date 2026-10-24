@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20261013">
+    <title>{% block title %}{{ '代理商后台' if is_agent_workspace else '管理员后台' }}{% endblock %} - 代理商认证查询系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/admin.css') }}?v=1" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/app-dialogs.css') }}?v=3" rel="stylesheet">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <aside class="sidebar" id="adminSidebar">
+        <div class="brand">
+            <span class="brand-icon"><i class="fas fa-shield-alt" aria-hidden="true"></i></span>
+            <div><strong>{{ '代理商管理系统' if is_agent_workspace else '管理员管理系统' }}</strong><span>授权管理 · {{ '代理工作台' if is_agent_workspace else '管理员工作台' }}</span></div>
+        </div>
+        <div class="nav-caption">工作空间</div>
+        <nav class="nav flex-column" aria-label="后台导航">
+            <a class="nav-link {% if request.endpoint in ('admin.dashboard', 'agent.dashboard') %}active{% endif %}"
+               href="{{ workspace_prefix }}/dashboard">
+                <i class="fas fa-home"></i> 控制台
+            </a>
+            <a class="nav-link {% if request.endpoint in ('admin.agents_page', 'agent.agents_page') %}active{% endif %}"
+               href="{{ workspace_prefix }}/agents">
+                <i class="fas fa-users"></i> 代理商管理
+            </a>
+            {% if current_user.is_admin %}
+            <a class="nav-link {% if request.endpoint == 'admin.settings_page' %}active{% endif %}"
+               href="/admin/settings">
+                <i class="fas fa-cog"></i> 系统设置
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin.query_settings_page' %}active{% endif %}"
+               href="/admin/query-settings">
+                <i class="fas fa-list-check"></i> 查询配置
+            </a>
+            <a class="nav-link {% if request.endpoint == 'admin.logs_page' %}active{% endif %}"
+               href="/admin/logs">
+                <i class="fas fa-clipboard-list"></i> 操作日志
+            </a>
+            {% endif %}
+        </nav>
+        <div class="sidebar-footer"><i class="fas fa-shield-alt" aria-hidden="true"></i> 授权信息，统一管理</div>
+    </aside>
+    <button class="sidebar-backdrop" type="button" id="sidebarBackdrop" aria-label="关闭导航"></button>
+
+    <header class="workspace-topbar">
+        <div class="workspace-location">
+            <button class="menu-toggle" id="menuToggle" type="button" aria-label="打开导航" aria-controls="adminSidebar" aria-expanded="false"><i class="fas fa-bars" aria-hidden="true"></i></button>
+            <span>{{ '代理工作台' if is_agent_workspace else '管理员工作台' }}</span><span class="topbar-divider">/</span>
+            <strong>{% if request.endpoint == 'admin.settings_page' %}系统设置{% elif request.endpoint == 'admin.query_settings_page' %}查询配置{% elif request.endpoint == 'admin.logs_page' %}操作日志{% elif request.endpoint in ('admin.agents_page', 'agent.agents_page') %}代理商管理{% else %}控制台{% endif %}</strong>
+        </div>
+        <div class="account-menu">
+            <button class="admin-account" type="button" id="accountMenuButton" aria-expanded="false" aria-controls="accountMenu">
+                <span class="account-avatar"><i class="fas fa-user" aria-hidden="true"></i></span>
+                <span class="account-copy"><strong>{{ current_user.username }}</strong><span>{{ '管理员' if current_user.is_admin else '授权代理商' }}</span></span>
+                <i class="fas fa-chevron-down account-chevron" aria-hidden="true"></i>
+            </button>
+            <div class="account-dropdown" id="accountMenu" hidden>
+                {% if current_user.is_admin %}<button type="button" id="changePasswordButton"><i class="fas fa-key"></i> 修改密码</button>{% endif %}
+                <button type="button" id="accountLogoutButton"><i class="fas fa-sign-out-alt"></i> 退出登录</button>
+            </div>
+        </div>
+    </header>
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+    {% include "partials/app_dialog.html" %}
+
+    {% if current_user.is_admin %}
+    <div class="modal fade" id="changePasswordModal" tabindex="-1" aria-labelledby="changePasswordModalTitle" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="changePasswordModalTitle"><i class="fas fa-key"></i> 修改密码</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <form id="passwordForm">
+                    <div class="modal-body">
+                        <div class="mb-3"><label for="oldPassword" class="form-label">当前密码</label><input type="password" class="form-control" id="oldPassword" required autocomplete="current-password"></div>
+                        <div class="mb-3"><label for="newPassword" class="form-label">新密码</label><input type="password" class="form-control" id="newPassword" required minlength="6" autocomplete="new-password"></div>
+                        <div><label for="confirmPassword" class="form-label">确认新密码</label><input type="password" class="form-control" id="confirmPassword" required minlength="6" autocomplete="new-password"></div>
+                    </div>
+                    <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-primary" id="savePasswordButton"><i class="fas fa-save"></i> 保存修改</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app-dialogs.js') }}?v=2"></script>
+    <script>
+        const menuToggle = document.getElementById('menuToggle');
+        function closeSidebar() {
+            document.body.classList.remove('sidebar-open');
+            menuToggle.setAttribute('aria-expanded', 'false');
+        }
+        menuToggle.addEventListener('click', function() {
+            const opened = document.body.classList.toggle('sidebar-open');
+            this.setAttribute('aria-expanded', String(opened));
+        });
+        document.getElementById('sidebarBackdrop').addEventListener('click', closeSidebar);
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') closeSidebar();
+        });
+        window.matchMedia('(min-width: 992px)').addEventListener('change', function(event) {
+            if (event.matches) closeSidebar();
+        });
+        const accountMenuButton = document.getElementById('accountMenuButton');
+        const accountMenu = document.getElementById('accountMenu');
+        accountMenuButton.addEventListener('click', function() {
+            const expanded = this.getAttribute('aria-expanded') === 'true';
+            this.setAttribute('aria-expanded', String(!expanded));
+            accountMenu.hidden = expanded;
+        });
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.account-menu')) {
+                accountMenuButton.setAttribute('aria-expanded', 'false');
+                accountMenu.hidden = true;
+            }
+        });
+
+        function logoutFromWorkspace(e) {
+            e.preventDefault();
+            window.showAppConfirm('确定要退出当前账号吗？', {title: '退出登录', confirmText: '退出'}).then(function(confirmed) {
+                if (!confirmed) return;
+                const logoutUrl = "{{ '/admin/logout' if current_user.is_admin else '/agent/logout' }}";
+                $.post(logoutUrl, function(response) {
+                    window.location.href = response.next_login_url || '{{ "/admin/login" if current_user.is_admin else "/agent/login" }}';
+                });
+            });
+        }
+        $('#accountLogoutButton').click(logoutFromWorkspace);
+        {% if current_user.is_admin %}
+        $('#changePasswordButton').click(function() {
+            accountMenuButton.setAttribute('aria-expanded', 'false');
+            accountMenu.hidden = true;
+            $('#passwordForm')[0].reset();
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('changePasswordModal')).show();
+        });
+        $('#passwordForm').submit(function(event) {
+            event.preventDefault();
+            const oldPassword = $('#oldPassword').val();
+            const newPassword = $('#newPassword').val();
+            if (newPassword !== $('#confirmPassword').val()) return alert('两次输入的新密码不一致');
+            if (newPassword.length < 6) return alert('新密码至少6位');
+            const button = $('#savePasswordButton').prop('disabled', true);
+            $.ajax({
+                url: '/admin/change-password', method: 'POST', contentType: 'application/json',
+                data: JSON.stringify({old_password: oldPassword, new_password: newPassword}),
+                success: function(response) { alert(response.message); bootstrap.Modal.getOrCreateInstance(document.getElementById('changePasswordModal')).hide(); },
+                error: function(xhr) { alert(xhr.responseJSON?.message || '修改失败，请稍后重试'); },
+                complete: function() { button.prop('disabled', false); }
+            });
+        });
+        {% endif %}
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

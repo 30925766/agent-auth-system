@@ -1,0 +1,122 @@
+.app-dialog {
+    position: fixed;
+    inset: 0;
+    width: min(390px, calc(100% - 32px));
+    max-width: calc(100% - 32px);
+    max-height: calc(100dvh - 32px);
+    height: fit-content;
+    margin: auto;
+    padding: 30px 28px 26px;
+    border: 1px solid #ddd8f4;
+    border-top: 5px solid #6558d9;
+    border-radius: 18px;
+    background: #fff;
+    color: #302b41;
+    text-align: center;
+    box-shadow: 0 24px 80px rgba(34, 25, 61, .25);
+}
+
+.app-dialog::backdrop {
+    background: rgba(31, 25, 48, .52);
+    backdrop-filter: blur(4px);
+}
+
+.app-dialog-icon {
+    display: grid;
+    width: 54px;
+    height: 54px;
+    margin: 0 auto 15px;
+    place-items: center;
+    border-radius: 50%;
+    background: #e6f7f0;
+    color: #249565;
+    box-shadow: 0 0 0 7px #f3fbf7;
+    font-size: 23px;
+}
+
+.app-dialog-warning .app-dialog-icon,
+.app-dialog-confirm .app-dialog-icon {
+    background: #fff4df;
+    color: #b87719;
+    box-shadow: 0 0 0 7px #fffaf0;
+}
+
+.app-dialog-warning { border-top-color: #e39a48; }
+.app-dialog-warning .app-dialog-icon { background: #fff0f0; color: #c15365; box-shadow: 0 0 0 7px #fff7f7; }
+
+.app-dialog h2 {
+    margin: 0;
+    color: #302b41;
+    font-size: 20px;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.app-dialog p {
+    margin: 10px 0 18px;
+    color: #716b80;
+    font-size: 14px;
+    line-height: 1.75;
+    overflow-wrap: anywhere;
+}
+
+.app-dialog-detail {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    margin-bottom: 20px;
+    padding: 10px 14px;
+    border: 1px solid #d8d2f2;
+    border-radius: 10px;
+    background: #f3f1ff;
+    color: #5b4db5;
+    font-size: 17px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+    user-select: text;
+}
+
+.app-dialog-detail[hidden] { display: none; }
+.app-dialog-detail::before { color: #27a467; font-family: "Font Awesome 6 Brands"; content: "\f1d7"; }
+.app-dialog:not(:has(.app-dialog-detail:not([hidden]))) p { margin-bottom: 22px; }
+
+.modal-dialog { display: flex; min-height: calc(100% - 2 * var(--bs-modal-margin)); align-items: center; }
+.modal-content { overflow: hidden; border: 1px solid #eee9f8; border-radius: 18px; background: #fff; box-shadow: 0 24px 80px rgba(34, 25, 61, .25); }
+.modal-header { background: #f8f6fd; border-color: #eee9f8; }
+.modal-title { color: #302b41; }
+.modal-footer { background: #fff; border-color: #eee9f8; }
+.modal .btn-primary { border-color: #6558d9; background: #6558d9; }
+.modal .btn-primary:hover { border-color: #5145bd; background: #5145bd; }
+.modal .btn-light { border-color: #e8e2f5; background: #f8f6fd; color: #625b71; }
+.modal .btn-light:hover { border-color: #e8e2f5; background: #efecf7; color: #5145bd; }
+.modal-backdrop.show { opacity: .58; }
+@media (max-width: 575.98px) {
+    .modal-header, .modal-footer { padding: 16px 18px; }
+    .modal-body { padding: 20px 18px; }
+}
+
+.app-dialog-actions { display: flex; gap: 10px; }
+.app-dialog-button {
+    width: 100%;
+    min-height: 46px;
+    padding: 10px 16px;
+    border: 0;
+    border-radius: 9px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.app-dialog-confirm-button { background: #6558d9; color: #fff; }
+.app-dialog-confirm-button:hover { background: #5145bd; }
+.app-dialog-cancel { border: 1px solid #e8e2f5; background: #f8f6fd; color: #625b71; }
+.app-dialog-cancel:hover { background: #efecf7; }
+.app-dialog-button:focus-visible { outline: 3px solid #a298ed; outline-offset: 3px; }
+
+@media (max-width: 480px) {
+    .app-dialog { padding: 26px 22px 22px; border-radius: 16px; }
+    .app-dialog h2 { font-size: 19px; }
+}

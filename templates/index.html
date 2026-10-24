@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}{{ site_settings.site_name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="query-container">
+        <div class="query-card">
+            <div class="card-header">
+                <h2><i class="fas fa-shield-alt"></i> {{ site_settings.page_heading }}</h2>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info text-center mb-4">
+                    <h4 class="mb-0">{{ site_settings.recharge_notice }}</h4>
+                </div>
+
+                <form id="queryForm">
+                    <div class="mb-3">
+                        <div class="input-group input-group-lg">
+                            <input type="text" class="form-control" id="queryValue"
+                                   placeholder="输入微信号查询代理是否为官方授权" required>
+                            <button class="btn btn-primary" type="submit">
+                                <i class="fas fa-search"></i> 查询
+                            </button>
+                        </div>
+                    </div>
+
+                    {% if site_settings.captcha_enabled %}
+                    <div class="mb-3">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="captchaInput"
+                                   placeholder="请输入验证码" maxlength="4" required>
+                            <img id="captchaImage" src="/api/captcha" alt="验证码"
+                                 class="captcha-img" title="点击刷新">
+                        </div>
+                    </div>
+                    {% endif %}
+
+                </form>
+
+                <div id="result" class="mt-4" style="display: none;"></div>
+                <div class="alert alert-warning mt-4 mb-0">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span class="site-safety-notice">{{ site_settings.safety_notice }}</span>
+                </div>
+                <p class="official-contact-note">若有疑问或需代理加盟，请<button type="button" class="official-contact-link" id="copyOfficialWechat">联系官方客服</button></p>
+            </div>
+        </div>
+
+        <div class="text-center mt-3">
+            <button type="button" class="authorized-button" id="viewAuthorizedAgents">
+                <i class="fas fa-user-shield" aria-hidden="true"></i> 查看已授权代理人员
+                <span aria-hidden="true">→</span>
+            </button>
+            <a class="authorized-button return-site-button" href="{{ site_settings.return_site_url }}">
+                <i class="fas fa-globe" aria-hidden="true"></i> 返回网站
+                <span aria-hidden="true">↗</span>
+            </a>
+        </div>
+    </div>
+</div>
+<dialog class="authorized-dialog" id="authorizedAgentsDialog" aria-labelledby="authorizedAgentsTitle">
+    <header class="authorized-header">
+        <div>
+            <span class="authorized-eyebrow">官方授权 · 公开可查</span>
+            <h2 id="authorizedAgentsTitle">已授权代理人员</h2>
+            <p>展示已启用的授权代理人员，联系方式已脱敏</p>
+        </div>
+        <button type="button" class="authorized-close" id="closeAuthorizedAgents" aria-label="关闭弹窗">×</button>
+    </header>
+    <div class="authorized-body">
+        <div class="authorized-summary" id="authorizedAgentsSummary" aria-live="polite"></div>
+        <div class="authorized-grid" id="authorizedAgentsList" aria-live="polite"></div>
+    </div>
+    <footer class="authorized-footer">请结合查询结果核实代理身份，谨防冒用授权信息。</footer>
+</dialog>
+<dialog class="app-dialog" id="officialWechatDialog" aria-labelledby="officialWechatDialogTitle" aria-describedby="officialWechatDialogMessage">
+    <div class="app-dialog-icon" id="officialWechatDialogIcon" aria-hidden="true"><i class="fas fa-check"></i></div>
+    <h2 id="officialWechatDialogTitle">微信号已复制</h2>
+    <p id="officialWechatDialogMessage">已成功复制客服微信，赶快去加客服微信反馈问题吧~</p>
+    <div class="app-dialog-detail" id="officialWechatDialogValue"></div>
+    <div class="app-dialog-actions">
+        <button type="button" class="app-dialog-button app-dialog-confirm-button" id="closeOfficialWechatDialog">知道了</button>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const authorizedDialog = document.getElementById('authorizedAgentsDialog');
+const authorizedList = document.getElementById('authorizedAgentsList');
+const authorizedSummary = document.getElementById('authorizedAgentsSummary');
+let authorizedRequest = 0;
+const captchaEnabled = {{ site_settings.captcha_enabled | tojson }};
+const queryDisplayFields = {{ {
+    'show_agent_nickname': site_settings.show_agent_nickname,
+    'show_agent_code': site_settings.show_agent_code,
+    'show_agent_wechat': site_settings.show_agent_wechat,
+    'show_agent_phone': site_settings.show_agent_phone,
+    'show_agent_authorization_date': site_settings.show_agent_authorization_date
+} | tojson }};
+const queryCopy = {{ {
+    'official_wechat': site_settings.official_wechat,
+    'certification_title': site_settings.certification_title,
+    'official_certification': site_settings.official_certification,
+    'assurance_notice': site_settings.assurance_notice,
+    'agent_nickname_label': site_settings.agent_nickname_label,
+    'agent_code_label': site_settings.agent_code_label,
+    'agent_wechat_label': site_settings.agent_wechat_label,
+    'agent_phone_label': site_settings.agent_phone_label,
+    'agent_authorization_date_label': site_settings.agent_authorization_date_label
+} | tojson }};
+
+document.getElementById('viewAuthorizedAgents').addEventListener('click', async function() {
+    const requestId = ++authorizedRequest;
+    authorizedDialog.showModal();
+    document.body.classList.add('authorized-modal-open');
+    authorizedList.replaceChildren();
+    authorizedSummary.textContent = '正在加载授权人员…';
+    try {
+        const response = await fetch('/api/authorized-agents', { cache: 'no-store' });
+        if (!response.ok) throw new Error('加载失败');
+        const result = await response.json();
+        if (requestId !== authorizedRequest) return;
+        authorizedSummary.textContent = `已授权代理人员 ${result.data.length} 位`;
+        if (!result.data.length) {
+            authorizedSummary.textContent = '暂无已授权代理人员';
+        }
+        for (const agent of result.data) {
+            const card = document.createElement('article');
+            card.className = 'authorized-agent';
+            const heading = document.createElement('div');
+            heading.className = 'authorized-agent-heading';
+            const nameGroup = document.createElement('div');
+            nameGroup.className = 'authorized-agent-name';
+            const name = document.createElement('h3');
+            name.textContent = agent.nickname || '';
+            const officialMark = document.createElement('span');
+            officialMark.className = 'official-certification';
+            officialMark.innerHTML = `<i class="fas fa-certificate" aria-hidden="true"></i><span>${queryCopy.official_certification}</span>`;
+            const avatar = document.createElement('img');
+            avatar.className = 'agent-avatar';
+            avatar.src = agent.avatar_url || '/static/images/default-avatar.svg';
+            avatar.alt = '代理商头像';
+            avatar.addEventListener('error', () => { avatar.src = '/static/images/default-avatar.svg'; }, { once: true });
+            const identity = document.createElement('div');
+            identity.className = 'agent-identity';
+            if (agent.display_fields.show_agent_nickname) nameGroup.append(name);
+            nameGroup.append(officialMark);
+            identity.append(avatar, nameGroup);
+            const badge = document.createElement('span');
+            badge.className = 'authorized-badge';
+            badge.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i><span>已授权</span>';
+            heading.append(identity, badge);
+            const details = document.createElement('dl');
+            const detailFields = [
+                ['show_agent_nickname', queryCopy.agent_nickname_label, agent.nickname],
+                ['show_agent_code', queryCopy.agent_code_label, agent.agent_code],
+                ['show_agent_wechat', queryCopy.agent_wechat_label, agent.wechat],
+                ['show_agent_phone', queryCopy.agent_phone_label, agent.phone],
+                ['show_agent_authorization_date', queryCopy.agent_authorization_date_label, agent.authorization_date || '未设置']
+            ];
+            for (const [setting, label, value] of detailFields) {
+                if (!agent.display_fields[setting] || !value) continue;
+                const term = document.createElement('dt');
+                term.textContent = label;
+                const description = document.createElement('dd');
+                description.textContent = value;
+                details.append(term, description);
+            }
+            card.append(heading, details);
+            authorizedList.append(card);
+        }
+    } catch (error) {
+        if (requestId !== authorizedRequest) return;
+        authorizedSummary.textContent = '加载失败，请稍后重试';
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.className = 'authorized-button authorized-retry';
+        retry.textContent = '重新加载';
+        retry.addEventListener('click', () => {
+            authorizedDialog.close();
+            document.getElementById('viewAuthorizedAgents').click();
+        });
+        authorizedList.append(retry);
+    }
+});
+document.getElementById('closeAuthorizedAgents').addEventListener('click', () => authorizedDialog.close());
+authorizedDialog.addEventListener('close', () => document.body.classList.remove('authorized-modal-open'));
+authorizedDialog.addEventListener('click', event => {
+    if (event.target !== authorizedDialog) return;
+    const bounds = authorizedDialog.getBoundingClientRect();
+    if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) {
+        authorizedDialog.close();
+    }
+});
+
+const officialWechatDialog = document.getElementById('officialWechatDialog');
+const officialWechatValue = document.getElementById('officialWechatDialogValue');
+const officialWechatDialogTitle = document.getElementById('officialWechatDialogTitle');
+const officialWechatDialogMessage = document.getElementById('officialWechatDialogMessage');
+const officialWechatDialogIcon = document.getElementById('officialWechatDialogIcon');
+
+document.getElementById('closeOfficialWechatDialog').addEventListener('click', function() {
+    officialWechatDialog.close();
+});
+officialWechatDialog.addEventListener('click', function(event) {
+    if (event.target === officialWechatDialog) officialWechatDialog.close();
+});
+
+document.getElementById('copyOfficialWechat').addEventListener('click', async function() {
+    const wechat = queryCopy.official_wechat;
+    let copied = false;
+    try {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(wechat);
+        } else {
+            const temporaryInput = document.createElement('textarea');
+            temporaryInput.value = wechat;
+            temporaryInput.setAttribute('readonly', '');
+            temporaryInput.style.position = 'fixed';
+            temporaryInput.style.opacity = '0';
+            document.body.append(temporaryInput);
+            temporaryInput.select();
+            const copySucceeded = document.execCommand('copy');
+            temporaryInput.remove();
+            if (!copySucceeded) throw new Error('clipboard copy failed');
+        }
+        copied = true;
+    } catch (error) {
+        copied = false;
+    }
+    officialWechatDialogTitle.textContent = copied ? '微信号已复制' : '请手动添加客服';
+    officialWechatDialogMessage.textContent = copied
+        ? '已成功复制客服微信，赶快去加客服微信反馈问题吧~'
+        : '自动复制未成功，请长按或手动复制下方客服微信号。';
+    officialWechatValue.textContent = wechat || '暂未设置客服微信号';
+    officialWechatDialog.classList.toggle('app-dialog-warning', !copied);
+    officialWechatDialogIcon.innerHTML = copied
+        ? '<i class="fas fa-check" aria-hidden="true"></i>'
+        : '<i class="fas fa-exclamation" aria-hidden="true"></i>';
+    officialWechatDialog.showModal();
+});
+
+$(document).ready(function() {
+    // 刷新验证码
+    $('#captchaImage').click(function() {
+        $(this).attr('src', '/api/captcha?' + Date.now());
+    });
+
+    // 提交查询
+    $('#queryForm').submit(function(e) {
+        e.preventDefault();
+
+        const queryValue = $('#queryValue').val().trim();
+        const captcha = captchaEnabled ? $('#captchaInput').val().trim() : '';
+
+        if (!queryValue || (captchaEnabled && !captcha)) {
+            showError('请填写完整信息');
+            return;
+        }
+
+        $.ajax({
+            url: '/api/query',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                query_value: queryValue,
+                captcha: captcha
+            }),
+            success: function(response) {
+                showSuccess(response.data);
+            },
+            error: function(xhr) {
+                const response = xhr.responseJSON;
+                if (xhr.status === 404) {
+                    showNotFound();
+                } else {
+                    showError(response.message || '查询失败，请重试');
+                }
+                // 刷新验证码
+                $('#captchaImage').click();
+                $('#captchaInput').val('');
+            }
+        });
+    });
+});
+
+function showSuccess(data) {
+    const result = document.createElement('div');
+    result.className = 'alert alert-success';
+    const heading = document.createElement('div');
+    heading.className = 'certification-heading';
+    const title = document.createElement('h4');
+    title.append(document.createElement('i'));
+    title.firstChild.className = 'fas fa-check-circle';
+    title.append(document.createTextNode(` ${queryCopy.certification_title}`));
+    const official = document.createElement('span');
+    official.className = 'official-certification official-certification-result';
+    official.innerHTML = `<i class="fas fa-certificate" aria-hidden="true"></i><span>${queryCopy.official_certification}</span>`;
+    heading.append(title, official);
+    result.append(heading, document.createElement('hr'));
+    const info = document.createElement('div');
+    info.className = 'agent-info';
+    for (const [setting, label, value] of [
+        ['show_agent_nickname', queryCopy.agent_nickname_label, data.nickname],
+        ['show_agent_code', queryCopy.agent_code_label, data.agent_code],
+        ['show_agent_wechat', queryCopy.agent_wechat_label, data.wechat],
+        ['show_agent_phone', queryCopy.agent_phone_label, data.phone],
+        ['show_agent_authorization_date', queryCopy.agent_authorization_date_label, data.authorization_date || '未设置']
+    ]) {
+        if (!queryDisplayFields[setting] || !value) continue;
+        const row = document.createElement('p');
+        const labelElement = document.createElement('strong');
+        labelElement.textContent = `${label}: `;
+        row.append(labelElement, document.createTextNode(value));
+        info.append(row);
+    }
+    result.append(info, document.createElement('hr'));
+    const assurance = document.createElement('p');
+    assurance.className = 'mb-0';
+    const assuranceIcon = document.createElement('i');
+    assuranceIcon.className = 'fas fa-shield-check';
+    const assuranceText = document.createElement('strong');
+    assuranceText.textContent = ` ${queryCopy.assurance_notice}`;
+    assurance.append(assuranceIcon, assuranceText);
+    result.append(assurance);
+    $('#result').empty().append(result).slideDown();
+    const avatar = document.createElement('img');
+    avatar.className = 'agent-avatar query-avatar';
+    avatar.src = data.avatar_url || '/static/images/default-avatar.svg';
+    avatar.alt = '代理商头像';
+    avatar.addEventListener('error', () => { avatar.src = '/static/images/default-avatar.svg'; }, { once: true });
+    info.prepend(avatar);
+}
+
+function showNotFound() {
+    const html = `
+        <div class="alert alert-danger">
+            <h4><i class="fas fa-times-circle"></i> 未查询到该代理商信息</h4>
+            <hr>
+            <p class="mb-0">该微信号/手机号不在授权代理商名单中，<br>请谨慎交易，谨防诈骗！</p>
+        </div>
+    `;
+    $('#result').html(html).slideDown();
+}
+
+function showError(message) {
+    const html = `
+        <div class="alert alert-danger">
+            <h4><i class="fas fa-exclamation-triangle"></i> 查询失败</h4>
+            <hr>
+            <p class="mb-0">${message}</p>
+        </div>
+    `;
+    $('#result').html(html).slideDown();
+}
+</script>
+{% endblock %}

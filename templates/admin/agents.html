@@ -1,0 +1,424 @@
+{% extends "admin/base_admin.html" %}
+
+{% block title %}代理商管理{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-heading">
+        <div><span class="page-eyebrow">授权人员</span><h2>代理商管理</h2><p>管理代理资料和授权状态{% if current_user.is_admin %}，并维护首页展示顺序{% endif %}。</p></div>
+        <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#agentModal" onclick="openAddModal()">
+            <i class="fas fa-plus"></i> 添加代理商
+        </button>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="row g-3 mb-3 agent-filters">
+                <div class="col-md-6">
+                    <input type="text" class="form-control" id="searchInput" aria-label="搜索代理商" placeholder="搜索昵称、微信号、手机号、代理编号">
+                </div>
+                <div class="col-md-3">
+                    <select class="form-select" id="statusFilter" aria-label="筛选代理商状态">
+                        <option value="">全部状态</option>
+                        <option value="1">启用</option>
+                        <option value="0">禁用</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-secondary" onclick="loadAgents()">
+                        <i class="fas fa-search"></i> 搜索
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                {% if current_user.is_admin %}
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-primary" id="saveAgentSort" onclick="saveAgentSort()"><i class="fas fa-sort-amount-up"></i> 保存当前页排序</button>
+                    <span class="text-muted small">排序值越小越靠前；相同数值按代理编号排列。保存后首页授权人员列表同步使用该顺序。</span>
+                </div>
+                {% endif %}
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            {% if current_user.is_admin %}<th>排序</th>{% endif %}
+                            <th>代理编号</th>
+                            <th>头像</th>
+                            <th>昵称</th>
+                            <th>微信号</th>
+                            <th>手机号</th>
+                            <th>授权时间</th>
+                            <th>状态</th>
+                            <th>代理登录</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="agentsTable"></tbody>
+                </table>
+            </div>
+
+            <nav>
+                <ul class="pagination" id="pagination"></ul>
+            </nav>
+        </div>
+    </div>
+</div>
+
+<!-- 添加/编辑代理商模态框 -->
+<div class="modal fade" id="agentModal" tabindex="-1" aria-labelledby="modalTitle">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">添加代理商</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="agentForm">
+                    <input type="hidden" id="agentId">
+                    <div class="mb-3">
+                        <label for="avatarInput" class="form-label">代理商头像</label>
+                        <div class="d-flex align-items-center gap-3 mb-2">
+                            <img id="avatarPreview" src="/static/images/default-avatar.svg" alt="头像预览" width="72" height="72" style="border-radius:50%;object-fit:cover;border:3px solid #eee8fb;">
+                            <input type="file" class="form-control" id="avatarInput" accept="image/jpeg,image/png,image/webp,image/gif">
+                        </div>
+                        <div class="form-text">支持 JPG、PNG、WEBP、GIF，最大 6MB。未设置时显示默认头像。</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">昵称 *</label>
+                        <input type="text" class="form-control" id="nickname" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">微信号 *</label>
+                        <input type="text" class="form-control" id="wechat" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">手机号 *</label>
+                        <input type="text" class="form-control" id="phone" required maxlength="11">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">授权时间</label>
+                        <input type="date" class="form-control" id="authorizationDate">
+                        <div class="form-text">代理商开始获得授权的日期，不作为到期日期。</div>
+                    </div>
+                    <div class="mb-3" id="statusGroup" style="display:none;">
+                        <label class="form-label">状态</label>
+                        <select class="form-select" id="status">
+                            <option value="1">启用</option>
+                            <option value="0">禁用</option>
+                        </select>
+                    </div>
+                    <div class="agent-login-box">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="loginEnabled">
+                            <label class="form-check-label" for="loginEnabled">允许该代理商登录授权系统</label>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label" for="loginUsername">代理登录账号</label>
+                            <input type="text" class="form-control" id="loginUsername" minlength="3" maxlength="50" autocomplete="off" placeholder="开启登录后必填">
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label" for="loginPassword">代理登录密码</label>
+                            <input type="password" class="form-control" id="loginPassword" minlength="6" autocomplete="new-password" placeholder="新增时必填，修改时留空表示不变">
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" onclick="saveAgent()">保存</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPage = 1;
+let currentAgentId = null;
+let agentsById = new Map();
+let avatarPreviewUrl = null;
+let savingAgent = false;
+let modalTrigger = null;
+
+function apiErrorMessage(xhr) {
+    if (xhr.responseJSON?.message) return xhr.responseJSON.message;
+    if (xhr.status === 502 || xhr.status === 503 || xhr.status === 504) {
+        return `服务器暂时无法连接（HTTP ${xhr.status}），请先刷新列表确认是否已添加，再重试或联系管理员检查服务日志`;
+    }
+    if (xhr.status === 413) return '上传文件过大，请选择6MB以内的头像';
+    if (xhr.status === 0) return '网络连接失败，请检查网络后重试';
+    if (xhr.status === 200 && xhr.responseText?.includes('<html')) return '登录已失效，请刷新页面重新登录';
+    return `请求失败（HTTP ${xhr.status}），请稍后重试`;
+}
+
+function resetAvatarPreview(url) {
+    if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+    avatarPreviewUrl = null;
+    $('#avatarInput').val('');
+    $('#avatarPreview').attr('src', url || '/static/images/default-avatar.svg');
+}
+
+$(document).ready(function() {
+    loadAgents();
+    const modalElement = document.getElementById('agentModal');
+    modalElement.addEventListener('show.bs.modal', function(event) {
+        modalTrigger = event.relatedTarget || document.activeElement;
+    });
+    modalElement.addEventListener('hide.bs.modal', function(event) {
+        if (savingAgent) {
+            event.preventDefault();
+            return;
+        }
+        if (modalElement.contains(document.activeElement)) document.activeElement.blur();
+    });
+    modalElement.addEventListener('hidden.bs.modal', function() {
+        const target = modalTrigger?.isConnected ? modalTrigger : document.querySelector('[data-bs-target="#agentModal"]');
+        target?.focus();
+    });
+    $('#avatarInput').on('change', function() {
+        const file = this.files[0];
+        if (!file) return;
+        if (file.size > 6 * 1024 * 1024) {
+            alert('头像文件不能超过6MB');
+            this.value = '';
+            return;
+        }
+        if (avatarPreviewUrl) URL.revokeObjectURL(avatarPreviewUrl);
+        avatarPreviewUrl = URL.createObjectURL(file);
+        $('#avatarPreview').attr('src', avatarPreviewUrl);
+    });
+
+    $('#searchInput').on('keypress', function(e) {
+        if (e.which === 13) loadAgents();
+    });
+});
+
+function loadAgents(page = 1) {
+    const search = $('#searchInput').val();
+    const status = $('#statusFilter').val();
+
+    $.get('{{ workspace_prefix }}/api/agents', { page, search, status }, function(response) {
+        currentPage = page;
+        agentsById = new Map(response.data.items.map(agent => [agent.id, agent]));
+        renderAgentsTable(response.data);
+        renderPagination(response.data);
+    }).fail(function(xhr) {
+        alert(apiErrorMessage(xhr));
+    });
+}
+
+function renderAgentsTable(data) {
+    const tbody = $('#agentsTable');
+    tbody.empty();
+
+    if (data.items.length === 0) {
+        tbody.append('<tr><td colspan="{{ 11 if current_user.is_admin else 10 }}" class="text-center">暂无数据</td></tr>');
+        return;
+    }
+
+    data.items.forEach(agent => {
+        const statusBadge = agent.status === 1
+            ? `<button type="button" class="badge bg-success status-toggle" onclick="toggleAgentStatus(${agent.id}, 0)" title="点击禁用">启用</button>`
+            : `<button type="button" class="badge bg-secondary status-toggle" onclick="toggleAgentStatus(${agent.id}, 1)" title="点击启用">禁用</button>`;
+        const loginBadge = agent.login_enabled
+            ? `<button type="button" class="badge bg-success status-toggle" onclick="toggleAgentLogin(${agent.id}, 0)" title="点击关闭代理登录">可登录</button>`
+            : `<button type="button" class="badge bg-secondary status-toggle" onclick="toggleAgentLogin(${agent.id}, 1)" title="点击开启代理登录">未启用</button>`;
+
+        const row = `
+            <tr>
+                {% if current_user.is_admin %}<td><input type="number" class="form-control form-control-sm agent-sort-input" data-agent-id="${agent.id}" value="${agent.sort_order}" min="0" max="999999" step="1" aria-label="代理商排序值" style="width:100px;"></td>{% endif %}
+                <td>${agent.agent_code}</td>
+                <td><img src="${agent.avatar_url || '/static/images/default-avatar.svg'}" alt="代理商头像" width="44" height="44" style="border-radius:50%;object-fit:cover;"></td>
+                <td>${agent.nickname}</td>
+                <td>${agent.wechat}</td>
+                <td>${agent.phone}</td>
+                <td>${agent.authorization_date || '-'}</td>
+                <td>${statusBadge}</td>
+                <td>${loginBadge}</td>
+                <td>${agent.created_at}</td>
+                <td>
+                    <button class="btn btn-sm btn-info" onclick="editAgent(${agent.id})">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    {% if current_user.is_admin %}<button class="btn btn-sm btn-light" onclick="reorderAgent(${agent.id}, 'up')" title="上移"><i class="fas fa-arrow-up"></i></button>
+                    <button class="btn btn-sm btn-light" onclick="reorderAgent(${agent.id}, 'down')" title="下移"><i class="fas fa-arrow-down"></i></button>
+                    <button class="btn btn-sm btn-light" onclick="reorderAgent(${agent.id}, 'top')" title="置顶"><i class="fas fa-arrow-up-wide-short"></i></button>{% endif %}
+                    <button class="btn btn-sm btn-danger" onclick="deleteAgent(${agent.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        tbody.append(row);
+    });
+}
+
+{% if current_user.is_admin %}
+function saveAgentSort() {
+    const items = [];
+    for (const input of document.querySelectorAll('.agent-sort-input')) {
+        if (!input.value || !input.reportValidity()) return;
+        items.push({id: Number(input.dataset.agentId), sort_order: Number(input.value)});
+    }
+    if (!items.length) return;
+    $('#saveAgentSort').prop('disabled', true);
+    $.ajax({
+        url: '{{ workspace_prefix }}/api/agents/sort',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({items}),
+        success: function(response) { alert(response.message); loadAgents(currentPage); },
+        error: function(xhr) { alert(apiErrorMessage(xhr)); },
+        complete: function() { $('#saveAgentSort').prop('disabled', false); }
+    });
+}
+
+{% endif %}
+function renderPagination(data) {
+    const pagination = $('#pagination');
+    pagination.empty();
+
+    for (let i = 1; i <= data.pages; i++) {
+        const active = i === data.page ? 'active' : '';
+        pagination.append(`
+            <li class="page-item ${active}">
+                <a class="page-link" href="#" onclick="loadAgents(${i}); return false;">${i}</a>
+            </li>
+        `);
+    }
+}
+
+function updateAgent(id, payload, successMessage) {
+    $.ajax({
+        url: `{{ workspace_prefix }}/api/agents/${id}`,
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function(response) { if (successMessage) alert(successMessage); loadAgents(currentPage); },
+        error: function(xhr) { alert(apiErrorMessage(xhr)); }
+    });
+}
+
+function toggleAgentStatus(id, status) {
+    updateAgent(id, {status}, status ? '代理商已启用' : '代理商已禁用');
+}
+
+function toggleAgentLogin(id, enabled) {
+    const agent = agentsById.get(id);
+    if (enabled && (!agent || !agent.login_username)) {
+        alert('请先点击编辑，设置代理登录账号和密码后再开启登录');
+        editAgent(id);
+        return;
+    }
+    updateAgent(id, {login_enabled: enabled}, enabled ? '代理登录已开启' : '代理登录已关闭');
+}
+
+{% if current_user.is_admin %}
+function reorderAgent(id, direction) {
+    $.ajax({
+        url: '{{ workspace_prefix }}/api/agents/reorder',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({id, direction}),
+        success: function(response) { loadAgents(currentPage); },
+        error: function(xhr) { alert(apiErrorMessage(xhr)); }
+    });
+}
+{% endif %}
+
+function openAddModal() {
+    $('#modalTitle').text('添加代理商');
+    $('#agentForm')[0].reset();
+    $('#agentId').val('');
+    $('#statusGroup').hide();
+    currentAgentId = null;
+    resetAvatarPreview();
+    $('#loginEnabled').prop('checked', false);
+    $('#loginUsername').val('');
+    $('#loginPassword').val('');
+}
+
+function editAgent(id) {
+    currentAgentId = id;
+    $('#modalTitle').text('编辑代理商');
+    $('#statusGroup').show();
+
+        const agent = agentsById.get(id);
+        if (agent) {
+            $('#agentId').val(agent.id);
+            $('#nickname').val(agent.nickname);
+            $('#wechat').val(agent.wechat);
+            $('#phone').val(agent.phone);
+            $('#authorizationDate').val(agent.authorization_date || '');
+            $('#status').val(agent.status);
+            $('#loginEnabled').prop('checked', agent.login_enabled === 1);
+            $('#loginUsername').val(agent.login_username || '');
+            $('#loginPassword').val('');
+            resetAvatarPreview(agent.avatar_url);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('agentModal')).show();
+        }
+}
+
+function saveAgent() {
+    if (savingAgent || !document.getElementById('agentForm').reportValidity()) return;
+    savingAgent = true;
+    $('#agentModal .modal-footer button, #agentModal .btn-close').prop('disabled', true);
+    const id = currentAgentId;
+    const data = new FormData();
+    data.append('nickname', $('#nickname').val());
+    data.append('wechat', $('#wechat').val());
+    data.append('phone', $('#phone').val());
+    data.append('authorization_date', $('#authorizationDate').val());
+    data.append('status', $('#status').val());
+    data.append('login_enabled', $('#loginEnabled').prop('checked') ? '1' : '0');
+    data.append('login_username', $('#loginUsername').val());
+    data.append('login_password', $('#loginPassword').val());
+    const avatar = $('#avatarInput')[0].files[0];
+    if (avatar) data.append('avatar', avatar);
+
+    const method = id ? 'PUT' : 'POST';
+    const url = id ? `{{ workspace_prefix }}/api/agents/${id}` : '{{ workspace_prefix }}/api/agents';
+
+    $.ajax({
+        url: url,
+        method: method,
+        dataType: 'json',
+        contentType: false,
+        processData: false,
+        data: data,
+        success: function(response) {
+            savingAgent = false;
+            alert(response.message);
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('agentModal')).hide();
+            loadAgents(currentPage);
+        },
+        error: function(xhr) {
+            alert(apiErrorMessage(xhr));
+        },
+        complete: function() {
+            savingAgent = false;
+            $('#agentModal .modal-footer button, #agentModal .btn-close').prop('disabled', false);
+        }
+    });
+}
+
+function deleteAgent(id) {
+    window.showAppConfirm('确定要删除该代理商吗？此操作无法撤销。', {title: '删除代理商', confirmText: '确认删除'}).then(confirmed => {
+        if (!confirmed) return;
+        $.ajax({
+            url: `{{ workspace_prefix }}/api/agents/${id}`,
+            method: 'DELETE',
+            success: function(response) {
+                alert(response.message);
+                loadAgents(currentPage);
+            },
+            error: function(xhr) {
+                alert(apiErrorMessage(xhr));
+            }
+        });
+    });
+}
+</script>
+{% endblock %}

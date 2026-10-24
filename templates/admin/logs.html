@@ -1,0 +1,72 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}操作日志{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="page-heading"><div><span class="page-eyebrow">安全审计</span><h2>操作日志</h2><p>记录管理员和代理商在授权系统中的登录与数据操作。</p></div><span class="page-heading-icon"><i class="fas fa-clipboard-list" aria-hidden="true"></i></span></div>
+    <div class="card">
+        <div class="card-header"><h5 class="mb-0"><i class="fas fa-history"></i> 操作记录</h5></div>
+        <div class="card-body">
+            <form id="logsFilter" class="row g-3 align-items-end">
+                <div class="col-12 col-xl-4">
+                    <label class="form-label" for="logsSearch">搜索日志</label>
+                    <input id="logsSearch" class="form-control" type="search" placeholder="时间、操作者、操作、对象、详情或 IP 地址">
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="logsAction">日志类型</label>
+                    <select id="logsAction" class="form-select"><option value="">全部类型</option></select>
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="logsStart">开始时间</label>
+                    <input id="logsStart" class="form-control" type="datetime-local">
+                </div>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="logsEnd">结束时间</label>
+                    <input id="logsEnd" class="form-control" type="datetime-local">
+                </div>
+                <div class="col-12 col-md-6 col-xl-2 d-flex gap-2">
+                    <button class="btn btn-primary flex-fill" type="submit"><i class="fas fa-search"></i> 搜索</button>
+                    <button class="btn btn-light" id="clearLogsFilter" type="button" title="清空筛选"><i class="fas fa-rotate-left"></i></button>
+                </div>
+            </form>
+            <div class="table-responsive"><table class="table table-hover mb-0 log-table"><thead><tr><th>时间</th><th>操作者</th><th>身份</th><th>操作</th><th>对象</th><th>详情</th><th>IP地址</th></tr></thead><tbody id="logsTable"><tr><td colspan="7" class="text-center py-5">正在加载…</td></tr></tbody></table></div>
+            <nav><ul class="pagination mb-0" id="logsPagination"></ul></nav>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+function loadLogs(page = 1) {
+    const params = {
+        page,
+        search: $('#logsSearch').val().trim(),
+        action: $('#logsAction').val(),
+        start_time: $('#logsStart').val(),
+        end_time: $('#logsEnd').val()
+    };
+    $.get('/admin/api/logs', params, function(response) {
+        const currentAction = $('#logsAction').val();
+        const actionSelect = $('#logsAction').empty().append('<option value="">全部类型</option>');
+        response.data.actions.forEach(action => $('<option>').val(action).text(action).appendTo(actionSelect));
+        actionSelect.val(currentAction);
+        const tbody = $('#logsTable').empty();
+        if (!response.data.items.length) { tbody.append('<tr><td colspan="7" class="text-center py-5">暂无操作日志</td></tr>'); return; }
+        response.data.items.forEach(log => {
+            const identity = log.actor_type === 'admin' ? '<span class="badge bg-primary-subtle text-primary">管理员</span>' : '<span class="badge bg-success-subtle text-success">代理商</span>';
+            const target = log.target_id ? `${log.target_type || ''} #${log.target_id}` : '-';
+            $('<tr>').append($('<td>').text(log.created_at), $('<td>').text(log.actor_name), $('<td>').html(identity), $('<td>').text(log.action), $('<td>').text(target), $('<td>').text(log.detail || '-'), $('<td>').text(log.ip_address || '-')).appendTo(tbody);
+        });
+        const pagination = $('#logsPagination').empty();
+        for (let pageNumber = 1; pageNumber <= response.data.pages; pageNumber++) $('<li>').addClass(`page-item ${pageNumber === response.data.page ? 'active' : ''}`).append($('<a>').addClass('page-link').attr('href', '#').text(pageNumber).on('click', function(event) { event.preventDefault(); loadLogs(pageNumber); })).appendTo(pagination);
+    }).fail(function() { $('#logsTable').html('<tr><td colspan="7" class="text-center py-5 text-danger">日志加载失败，请刷新重试</td></tr>'); });
+}
+$('#logsFilter').on('submit', function(event) { event.preventDefault(); loadLogs(1); });
+$('#clearLogsFilter').on('click', function() {
+    $('#logsSearch, #logsStart, #logsEnd').val('');
+    $('#logsAction').val('');
+    loadLogs(1);
+});
+$('#logsSearch').on('keydown', function(event) { if (event.key === 'Enter') { event.preventDefault(); loadLogs(1); } });
+$(document).ready(() => loadLogs());
+</script>
+{% endblock %}

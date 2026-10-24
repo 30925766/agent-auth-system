@@ -1,0 +1,60 @@
+{% extends "admin/base_admin.html" %}
+{% block title %}查询配置{% endblock %}
+{% block content %}
+<div class="container-fluid">
+    <div class="page-heading"><div><span class="page-eyebrow">前端展示</span><h2>查询配置</h2><p>控制认证结果和已授权代理人员列表中展示的代理信息。</p></div><span class="page-heading-icon"><i class="fas fa-list-check" aria-hidden="true"></i></span></div>
+    <div class="card settings-card">
+        <div class="card-header"><h5 class="mb-0"><i class="fas fa-eye"></i> 代理信息显示</h5><p>关闭的字段不会在查询结果或已授权代理人员弹窗中显示。</p></div>
+        <div class="card-body">
+            <form id="querySettingsForm">
+                <div class="row g-3">
+                    {% for key, label, description in [
+                        ('show_agent_nickname', '代理昵称', '控制代理昵称和微信昵称的显示'),
+                        ('show_agent_code', '代理编号', '控制代理编号的显示'),
+                        ('show_agent_wechat', '微信号', '控制脱敏微信号的显示'),
+                        ('show_agent_phone', '手机号', '控制脱敏手机号的显示'),
+                        ('show_agent_authorization_date', '授权时间', '控制授权开始日期的显示')
+                    ] %}
+                    <div class="col-12 col-md-6">
+                        <div class="query-field-setting">
+                            <div>
+                                <label class="form-check-label fw-semibold" for="{{ key }}">{{ label }}</label>
+                                <div class="form-text">{{ description }}</div>
+                            </div>
+                            <div class="form-check form-switch mb-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="{{ key }}" {% if site_settings[key] %}checked{% endif %}>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    <div class="col-12 settings-actions"><button class="btn btn-primary" id="saveQuerySettings" type="submit"><i class="fas fa-save"></i> 保存查询配置</button><span id="querySettingsMessage" class="ms-2" role="status"></span></div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block extra_css %}
+<style>
+.query-field-setting { min-height: 78px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border: 1px solid var(--admin-border); border-radius: 10px; background: #fff; }
+.query-field-setting .form-text { margin-top: 4px; }
+.query-field-setting .form-check-input { width: 2.5em; height: 1.3em; margin: 0; cursor: pointer; }
+</style>
+{% endblock %}
+{% block extra_js %}
+<script>
+$('#querySettingsForm').submit(function(event) {
+    event.preventDefault();
+    const keys = ['show_agent_nickname', 'show_agent_code', 'show_agent_wechat', 'show_agent_phone', 'show_agent_authorization_date'];
+    const values = Object.fromEntries(keys.map(key => [key, $(`#${key}`).prop('checked')]));
+    const button = $('#saveQuerySettings').prop('disabled', true);
+    $('#querySettingsMessage').removeClass('text-success text-danger').text('正在保存…');
+    $.ajax({
+        url: '/admin/api/query-settings', method: 'PUT', contentType: 'application/json', data: JSON.stringify(values),
+        success: response => $('#querySettingsMessage').addClass('text-success').text(response.message),
+        error: xhr => $('#querySettingsMessage').addClass('text-danger').text(xhr.responseJSON?.message || '保存失败，请重试'),
+        complete: () => button.prop('disabled', false)
+    });
+});
+</script>
+{% endblock %}

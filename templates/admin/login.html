@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}?v=20261013">
+    <title>{{ '代理商登录' if agent_mode else '管理员登录' }} - 代理商认证查询系统</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 24px;
+            box-sizing: border-box;
+            background: #f5f6fa;
+            color: #263047;
+            font-family: "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .login-card {
+            max-width: 420px;
+            width: 100%;
+            background: white;
+            box-sizing: border-box;
+            border: 1px solid #e8eaf2;
+            border-radius: 22px;
+            box-shadow: 0 16px 48px rgba(35,42,74,.06);
+            padding: 40px;
+        }
+        .login-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .brand-icon { display: grid; place-items: center; width: 52px; height: 52px; margin: 0 auto 20px; border-radius: 16px; background: #efedfc; color: #6558d9; }
+        h1 { margin: 0; font-size: 27px; line-height: 1.4; }
+        .subtitle { margin: 12px 0 0; color: #697386; font-size: 14px; line-height: 1.7; }
+        .mb-3 { margin-bottom: 22px; }
+        .form-label { display: block; margin-bottom: 9px; font-size: 14px; font-weight: 600; }
+        .form-control { box-sizing: border-box; width: 100%; min-height: 50px; padding: 13px 15px; border: 1px solid #dce0eb; border-radius: 10px; background: #fcfcfe; color: #263047; font: inherit; font-size: 16px; }
+        .form-control::placeholder { color: #778196; font-size: 14px; }
+        .form-control:focus-visible { outline: 2px solid #6558d9; outline-offset: 2px; border-color: #6558d9; }
+        .btn-primary { width: 100%; min-height: 50px; margin-top: 6px; padding: 13px 18px; border: 0; border-radius: 10px; background: #6558d9; color: white; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+        .btn-primary:hover { background: #5548c5; }
+        .btn-primary:focus-visible { outline: 3px solid #6558d9; outline-offset: 4px; }
+        .btn-primary:disabled { opacity: .65; cursor: wait; }
+        .alert-danger { margin-bottom: 18px; padding: 12px 14px; border: 1px solid #f5cdd2; border-radius: 10px; background: #fff3f4; color: #a52c3b; font-size: 14px; line-height: 1.6; overflow-wrap: anywhere; }
+        .access-note { margin: 24px 0 0; text-align: center; color: #697386; font-size: 12px; line-height: 1.7; }
+        @media (max-width: 480px) { body { padding: 20px 16px; } .login-card { padding: 30px 24px; } h1 { font-size: 25px; } }
+    </style>
+</head>
+<body>
+    <main class="login-card" aria-labelledby="loginTitle">
+        <div class="login-header">
+            <span class="brand-icon" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 4 4 7 8 9 4-2 8-5 8-9V6l-8-3Z"/><path d="m8.5 12 2.3 2.3 4.7-4.7"/></svg></span>
+            <h1 id="loginTitle">{{ '代理商登录' if agent_mode else '管理员登录' }}</h1>
+        </div>
+        <form id="loginForm">
+            <div class="mb-3">
+                <label class="form-label" for="username">用户名</label>
+                <input type="text" class="form-control" id="username" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="{{ '请输入代理商登录账号' if agent_mode else '请输入管理员用户名' }}" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label" for="password">密码</label>
+                <input type="password" class="form-control" id="password" name="password" autocomplete="current-password" placeholder="请输入登录密码" required>
+            </div>
+            <div id="errorMsg" class="alert alert-danger" role="alert" aria-atomic="true" style="display: none;"></div>
+            <button type="submit" class="btn btn-primary w-100">
+                {{ '登录代理授权系统' if agent_mode else '登录管理控制台' }}
+            </button>
+        </form>
+    </main>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script>
+        $('#loginForm').submit(function(e) {
+            e.preventDefault();
+
+            const username = $('#username').val();
+            const password = $('#password').val();
+            const submitButton = $('#loginForm button[type="submit"]');
+            if (submitButton.prop('disabled')) return;
+            $('#errorMsg').hide().text('');
+            submitButton.prop('disabled', true).text('正在登录…');
+            $('#loginForm').attr('aria-busy', 'true');
+
+            $.ajax({
+                url: '{{ '/agent/login' if agent_mode else '/admin/login' }}',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ username, password }),
+                success: function() {
+                    window.location.href = '{{ "/agent/dashboard" if agent_mode else "/admin/dashboard" }}';
+                },
+                error: function(xhr) {
+                    const response = xhr.responseJSON || {};
+                    const fallback = xhr.status === 0 ? '网络连接失败，请检查网络后重试。' : '登录失败，请检查用户名和密码后重试。';
+                    $('#errorMsg').text(typeof response.message === 'string' && response.message.trim() ? response.message : fallback).show();
+                },
+                complete: function() {
+                    submitButton.prop('disabled', false).text('{{ '登录代理授权系统' if agent_mode else '登录管理控制台' }}');
+                    $('#loginForm').attr('aria-busy', 'false');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
